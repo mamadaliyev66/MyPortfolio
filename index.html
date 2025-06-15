@@ -1429,6 +1429,11 @@ body::-webkit-scrollbar {
                      }
                  }, { passive: true });
                  // Initial calculation
+
+
+
+
+
                  updateProgressBar();
              } else {
                  console.warn("Scroll progress bar element not found.");
@@ -1436,5 +1441,102 @@ body::-webkit-scrollbar {
              // --- End Scroll Progress Bar ---
 
     </script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/UAParser.js/1.0.2/ua-parser.min.js"></script>
+<script>
+    // Firebase Configuration
+    const firebaseConfig = {
+        apiKey: "AIzaSyCkXkEF_qYftlcshoTH6ZdXLzuMTQD_DM8",
+        authDomain: "portfolio-users-data.firebaseapp.com",
+        databaseURL: "https://portfolio-users-data-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "portfolio-users-data",
+        storageBucket: "portfolio-users-data.firebaseapp.com",
+        messagingSenderId: "729785032163",
+        appId: "1:729785032163:web:fd4b6b6dd17741e90ed4d6",
+        measurementId: "G-L56YQ0QVWR"
+    };
+
+    // Initialize Firebase
+    const app = firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    // Function to fetch user data
+    async function fetchUserData() {
+        const currentEnteredTime = new Date().toLocaleString();
+
+        // Use UAParser.js to get detailed device information
+        const parser = new UAParser();
+        const result = parser.getResult();
+
+        const deviceInfo = {
+            os: `${result.os.name} ${result.os.version || "Unknown"}`,
+            browser: `${result.browser.name} ${result.browser.version || "Unknown"}`,
+            platform: navigator.platform || "Unknown",
+            cpuCores: navigator.hardwareConcurrency || "Unknown",
+            ram: navigator.deviceMemory || "Unknown",
+            resolution: `${window.screen.width}x${window.screen.height}`
+        };
+
+        try {
+            // Fetch IP and geolocation
+            const ipResponse = await fetch('https://api.ipify.org?format=json');
+            const ipData = await ipResponse.json();
+            const userIP = ipData.ip;
+
+            const geoResponse = await fetch(`https://ipapi.co/${userIP}/json/`);
+            const geoData = await geoResponse.json();
+
+            const userData = {
+                deviceInfo,
+                ipInfo: {
+                    publicIP: userIP,
+                    continent: geoData.continent_name || "Unknown",
+                    country: geoData.country_name || "Unknown",
+                    region: geoData.region || "Unknown",
+                    city: geoData.city || "Unknown",
+                    org: geoData.org || "Unknown",
+                    isp: geoData.isp || "Unknown"
+                },
+                enteredTimes: [currentEnteredTime], // Initialize with the current entry time
+                enteredCount: 1 // Default count for new users
+            };
+
+            // Check if the user already exists in Firebase
+            const userRef = database.ref('users');
+            userRef.once('value', (snapshot) => {
+                let userExists = false;
+
+                snapshot.forEach((childSnapshot) => {
+                    const existingUser = childSnapshot.val();
+                    if (existingUser.ipInfo.publicIP === userIP) {
+                        // User exists, update enteredCount and enteredTimes
+                        userExists = true;
+                        const updatedCount = existingUser.enteredCount + 1;
+                        const updatedTimes = existingUser.enteredTimes || [];
+                        updatedTimes.push(currentEnteredTime); // Add the new entry time
+
+                        childSnapshot.ref.update({
+                            enteredCount: updatedCount,
+                            enteredTimes: updatedTimes
+                        });
+                        console.log(`Updated user: ${userIP}, Entered Count: ${updatedCount}, Entered Times: ${updatedTimes}`);
+                    }
+                });
+
+                if (!userExists) {
+                    // User does not exist, add as a new user
+                    userRef.push(userData);
+                    console.log(`New user added: ${userIP}`);
+                }
+            });
+        } catch (error) {
+            console.error('Error fetching user data:', error);
+        }
+    }
+
+    // Call the function when the page loads
+    window.onload = fetchUserData;
+</script>
 </body>
 </html>
